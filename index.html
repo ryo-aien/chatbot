@@ -378,13 +378,10 @@
                         response = JSON.stringify(response[1].content);
                     }
                     
-                    console.log(result.data[0][1].content)
-                    console.log(this.history)
                     // 履歴を更新
                     this.history.push();
 
                     this.isLoading = false;
-                    console.log(response)
                     return response.slice(1, -1);
                     
                 } catch (error) {
