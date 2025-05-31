@@ -24,7 +24,7 @@
         .chat-container {
             width: 100%;
             max-width: 800px;
-            height: 600px;
+            height: 700px;
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px);
             border-radius: 24px;
@@ -251,22 +251,97 @@
             text-align: center;
         }
 
+        /* 備考セクション */
+        .notes-section {
+            background: rgba(15, 23, 42, 0.95);
+            border-top: 1px solid rgba(75, 85, 99, 0.3);
+            padding: 20px;
+            min-height: 120px;
+            max-height: 200px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .notes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .notes-title {
+            color: #e2e8f0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .notes-toggle {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .notes-toggle:hover {
+            color: #e2e8f0;
+            background: rgba(75, 85, 99, 0.3);
+        }
+
+        .notes-content {
+            flex: 1;
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid rgba(75, 85, 99, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            overflow-y: auto;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+
+        .notes-content.empty {
+            color: rgba(156, 163, 175, 0.6);
+            font-style: italic;
+        }
+
+        .notes-section.collapsed {
+            min-height: auto;
+            max-height: 60px;
+        }
+
+        .notes-section.collapsed .notes-content {
+            display: none;
+        }
+
         /* スクロールバーのスタイル */
-        .messages-container::-webkit-scrollbar {
+        .messages-container::-webkit-scrollbar,
+        .notes-content::-webkit-scrollbar {
             width: 6px;
         }
 
-        .messages-container::-webkit-scrollbar-track {
+        .messages-container::-webkit-scrollbar-track,
+        .notes-content::-webkit-scrollbar-track {
             background: rgba(55, 65, 81, 0.3);
             border-radius: 3px;
         }
 
-        .messages-container::-webkit-scrollbar-thumb {
+        .messages-container::-webkit-scrollbar-thumb,
+        .notes-content::-webkit-scrollbar-thumb {
             background: rgba(156, 163, 175, 0.5);
             border-radius: 3px;
         }
 
-        .messages-container::-webkit-scrollbar-thumb:hover {
+        .messages-container::-webkit-scrollbar-thumb:hover,
+        .notes-content::-webkit-scrollbar-thumb:hover {
             background: rgba(156, 163, 175, 0.7);
         }
 
@@ -278,6 +353,11 @@
             
             .message-content {
                 max-width: 85%;
+            }
+
+            .notes-section {
+                min-height: 100px;
+                max-height: 150px;
             }
         }
     </style>
@@ -317,11 +397,28 @@
             </form>
             <div class="error-message" id="errorMessage"></div>
         </div>
+
+        <!-- 備考セクション -->
+        <div class="notes-section" id="notesSection">
+            <div class="notes-header">
+                <div class="notes-title">
+                    <span>📝</span>
+                    備考
+                </div>
+                <button class="notes-toggle" id="notesToggle" title="セクションを折りたたむ">
+                    ▼
+                </button>
+            </div>
+            <div class="notes-content" id="notesContent">
+                メモや備考はここに表示されます
+            </div>
+        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.0/axios.min.js"></script>
     <script type="module">
         import { Client } from "https://esm.sh/@gradio/client";
+        
         class ChatAPI {
             constructor() {
                 this.client = null;
@@ -404,9 +501,82 @@
             }
         }
 
+        class NotesManager {
+            constructor() {
+                this.notesContent = document.getElementById('notesContent');
+                this.notesSection = document.getElementById('notesSection');
+                this.notesToggle = document.getElementById('notesToggle');
+                this.isCollapsed = false;
+                
+                this.sampleNotes = [
+                    "・有料GPUサーバーのため、利用上限あり",
+                    "・Sleep状態からRunningまで、待機時間",
+                    "・GPU: Nvidia H200",
+                    "・モデル: elyza/Llama-3-ELYZA-JP-8B"
+                ];
+                
+                this.init();
+            }
+
+            init() {
+                this.loadNotes();
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                this.notesToggle.addEventListener('click', () => {
+                    this.toggleSection();
+                });
+            }
+
+            loadNotes() {
+                // サンプルの備考を表示
+                const notesText = this.sampleNotes.join('\n');
+                this.notesContent.textContent = notesText;
+                
+                if (!notesText.trim()) {
+                    this.notesContent.textContent = "表示する備考がありません";
+                    this.notesContent.classList.add('empty');
+                } else {
+                    this.notesContent.classList.remove('empty');
+                }
+            }
+
+            // 外部から備考を更新するメソッド
+            updateNotes(newNotes) {
+                if (Array.isArray(newNotes)) {
+                    this.notesContent.textContent = newNotes.join('\n');
+                } else {
+                    this.notesContent.textContent = newNotes;
+                }
+                
+                if (!newNotes || (Array.isArray(newNotes) && newNotes.length === 0)) {
+                    this.notesContent.textContent = "表示する備考がありません";
+                    this.notesContent.classList.add('empty');
+                } else {
+                    this.notesContent.classList.remove('empty');
+                }
+            }
+
+            toggleSection() {
+                this.isCollapsed = !this.isCollapsed;
+                
+                if (this.isCollapsed) {
+                    this.notesSection.classList.add('collapsed');
+                    this.notesToggle.textContent = '▲';
+                    this.notesToggle.title = 'セクションを展開する';
+                } else {
+                    this.notesSection.classList.remove('collapsed');
+                    this.notesToggle.textContent = '▼';
+                    this.notesToggle.title = 'セクションを折りたたむ';
+                }
+            }
+        }
+
         class ChatUI {
             constructor() {
                 this.api = new ChatAPI();
+                this.notesManager = new NotesManager();
                 this.messagesContainer = document.getElementById('messagesContainer');
                 this.messageInput = document.getElementById('messageInput');
                 this.sendButton = document.getElementById('sendButton');
@@ -533,7 +703,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             new ChatUI();
         });
-    </script>
     </script>
 </body>
 </html>
